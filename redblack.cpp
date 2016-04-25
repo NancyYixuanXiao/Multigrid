@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include "redblack.h"
+#include <omp.h>
 using namespace std;
 #define TOL 1.0e-6
 
@@ -61,6 +62,88 @@ void redBlackSerial(double * T, double * b,
                             T[index_up]   + T[index_down] )) + b[index];
             }
         }
+        for (i=2; i<n-1; i+=2) {
+            for (j=1; j<m-1; j+=2) {
+                index       = getIndex(i, j, m);
+                index_left  = getIndex(i-1, j, m);
+                index_right = getIndex(i+1, j, m);
+                index_up    = getIndex(i, j+1, m);
+                index_down  = getIndex(i, j-1, m);
+
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[index_left] + T[index_right] +
+                            T[index_up]   + T[index_down] )) + b[index];
+            }
+        }
+        iter ++;
+    }
+}
+/* Red-Black 2D algorithm with parallelization
+
+    In: T, b, n, m, itermax (optional)
+        n,m are # rows / colummns
+*/
+void redBlackParallel(double * T, double * b,
+                    int n, int m, double alpha, int itermax) {
+    int i, j;
+    int index, index_left, index_right, index_up, index_down;
+
+    int iter = 0;
+    while (iter < itermax) {
+        // update half the board in parallel
+        #pragma omp parallel for collapse(2) \
+                private(i, j) shared(T, b, n, m, alpha)
+        for (i=1; i<n-1; i+=2) {
+            for (j=1; j<m-1; j+=2) {
+                index       = getIndex(i, j, m);
+                index_left  = getIndex(i-1, j, m);
+                index_right = getIndex(i+1, j, m);
+                index_up    = getIndex(i, j+1, m);
+                index_down  = getIndex(i, j-1, m);
+
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[index_left] + T[index_right] +
+                            T[index_up]   + T[index_down] )) + b[index];
+            }
+        }
+        #pragma omp parallel for collapse(2) \
+                private(i, j) shared(T, b, n, m, alpha)
+        for (i=2; i<n-1; i+=2) {
+            for (j=2; j<m-1; j+=2) {
+                index       = getIndex(i, j, m);
+                index_left  = getIndex(i-1, j, m);
+                index_right = getIndex(i+1, j, m);
+                index_up    = getIndex(i, j+1, m);
+                index_down  = getIndex(i, j-1, m);
+
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[index_left] + T[index_right] +
+                            T[index_up]   + T[index_down] )) + b[index];
+            }
+        }
+
+        // update second half of the board
+        #pragma omp parallel for collapse(2) \
+                private(i, j) shared(T, b, n, m, alpha)
+        for (i=1; i<n-1; i+=2) {
+            for(j=2; j<m-1; j+=2) {
+                index       = getIndex(i, j, m);
+                index_left  = getIndex(i-1, j, m);
+                index_right = getIndex(i+1, j, m);
+                index_up    = getIndex(i, j+1, m);
+                index_down  = getIndex(i, j-1, m);
+
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[index_left] + T[index_right] +
+                            T[index_up]   + T[index_down] )) + b[index];
+            }
+        }
+        #pragma omp parallel for collapse(2) \
+                private(i, j) shared(T, b, n, m, alpha)
         for (i=2; i<n-1; i+=2) {
             for (j=1; j<m-1; j+=2) {
                 index       = getIndex(i, j, m);
