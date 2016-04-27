@@ -12,7 +12,7 @@ int serial_multigrid(int Lmax)
     param_t p;
     int nlev;
     int i,j,lev;
-    
+
     //set parameters________________________________________
     p.Lmax = Lmax; // max number of levels
     p.N = 2*(int)pow(2,p.Lmax);  // MUST BE POWER OF 2
@@ -23,18 +23,18 @@ int serial_multigrid(int Lmax)
         printf("  ERROR: More levels than available in lattice! \n");
         return 1;
     }
-    
+
     double resmag = 1.0; // not rescaled.
     int ncycle = 0;
     int n_per_lev = 10;
-    
+
     printf("  V cycle for %d by %d lattice with nlev = %d out of max %d \n", p.N, p.N, nlev, p.Lmax);
-    
+
     // initialize arrays__________________________________
     p.size[0] = p.N;
     p.a[0] = 1.0;
     p.scale[0] = 1.0/(4.0 + p.m*p.m);
-    
+
     for(lev = 1;lev< p.Lmax+1; lev++)
     {
         p.size[lev] = (p.size[lev-1])/2;
@@ -42,54 +42,54 @@ int serial_multigrid(int Lmax)
         p.scale[lev] = 1.0/(4.0 + p.m*p.m*p.a[lev]*p.a[lev]);
         //        p.scale[lev] = 1.0/(4.0 + p.m*p.m);
     }
-    
+
     for(lev = 0;lev< p.Lmax+1; lev++)
     {
         phi[lev] = (double *) malloc(p.size[lev]*p.size[lev] * sizeof(double));
         res[lev] = (double *) malloc(p.size[lev]*p.size[lev] * sizeof(double));
-        
+
         for(i = 0; i < p.size[lev]*p.size[lev]; i++)
         {
             phi[lev][i] = 0.0;
             res[lev][i] = 0.0;
         }
     }
-    
+
     // res[0][p.N/2 + (p.N/2)*p.N] = 1.0*p.scale[0];  //unit point source in middle of N by N lattice
     res[0][(1*(p.N/4)) + ((1*(p.N/4)))*p.N] = 1.0*p.scale[0];
     res[0][(1*(p.N/4)) + ((3*(p.N/4)))*p.N] = 1.0*p.scale[0];
     res[0][(3*(p.N/4)) + ((1*(p.N/4)))*p.N] = 1.0*p.scale[0];
     res[0][(3*(p.N/4)) + ((3*(p.N/4)))*p.N] = 1.0*p.scale[0];
-    
+
     // iterate to solve_____________________________________
     resmag = 1.0; // not rescaled.
     ncycle = 0;
     n_per_lev = 10;
     resmag = GetResRoot(phi[0],res[0],0,p);
     printf("    At the %d cycle the mag residue is %g \n",ncycle,resmag);
-    
+
     while(resmag > 0.00001)
     {
         ncycle +=1;
-        
+
         for(lev = 0;lev<nlev; lev++)
         {  //go down
             relax(phi[lev],res[lev],lev, n_per_lev,p); // lev = 1, ..., nlev-1
             proj_res(res[lev + 1], res[lev], phi[lev], lev,p);    // res[lev+1] += P^dag res[lev]
         }
-        
+
         for(lev = nlev;lev >= 0; lev--)
         { //come up
             relax(phi[lev],res[lev],lev, n_per_lev,p);   // lev = nlev -1, ... 0;
             if(lev > 0) inter_add(phi[lev-1], phi[lev], lev, p);   // phi[lev-1] += error = P phi[lev] and set phi[lev] = 0;
         }
         resmag = GetResRoot(phi[0],res[0],0,p);
-        
+
         if (ncycle % 500 == 0) printf("    At the %d cycle the mag residue is %g \n", ncycle, resmag);
     }
     printf("At the %d cycle the mag residue is %g \n", ncycle, resmag);
     FILE *file = fopen("serial_data.dat", "w+");
-    
+
     for (i=0; i< p.N; i++)
     {
         for (j=0; j<p.N; j++)
@@ -97,19 +97,53 @@ int serial_multigrid(int Lmax)
             fprintf(file, "%i %i %f\n", i, j, phi[0][i + j*p.N]);
         }
     }
-    
+
     return 0;
 }
 
 //red-black relaxation
 void relax(double *phi, double *res, int lev, int niter, param_t p) {
     // printf("relax2: level %i\n", lev);
-    int i, x, y;
+    int i, j;
     int L = p.size[lev];
-    double left, right, up, down;
-    
-    for(i=0; i < niter; i++)
-    {
+
+    for(int iter=0; iter < niter; i++) {
+        for (i=1; i<L-1; i++) {
+            for (j=1; j<L-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = 1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i, j-1+shift, m);
+                int pos_r = getIndex(i, j+1+shift, m);
+                int pos_u    = getIndex(i+1, j+shift, m);
+                int pos_d  = getIndex(i-1, j+shift, m);
+
+                phi[index] = p.scale[lev] * (phi[pos_l] + phi[pos_r]  +
+                                           phi[pos_u] + phi[pos_d]) +
+                           res[index];
+            }
+        }
+
+        // update second half of the board
+        //#pragma omp parallel for collapse(2) shared(T,b)
+        for (i=1; i<L-1; i++) {
+            for (j=2; j<L-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = 1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i, j-1+shift, m);
+                int pos_r = getIndex(i, j+1+shift, m);
+                int pos_u    = getIndex(i+1, j+shift, m);
+                int pos_d  = getIndex(i-1, j+shift, m);
+
+                phi[index] = p.scale[lev] * (phi[pos_l] + phi[pos_r]  +
+                                           phi[pos_u] + phi[pos_d]) +
+                           res[index];
+            }
+        }
+/*
         for(x = 0; x < L; x+=2)
         {
             for(y = 0; y < L; y+=2) {
@@ -130,7 +164,7 @@ void relax(double *phi, double *res, int lev, int niter, param_t p) {
                 phi[x + y*L] = res[x + y*L] + p.scale[lev] * (left + right + up + down);
             }
         }
-        
+
         for(x = 0; x < L; x+=2)
         {
             for(y = 1; y < L; y+=2) {
@@ -144,15 +178,17 @@ void relax(double *phi, double *res, int lev, int niter, param_t p) {
         for(x = 1; x < L; x+=2)
         {
             for(y = 0; y < L; y+=2) {
-                left  = (x == 0)   ? res[x + y*L] : phi[(x-1) +  y   *L];
-                right = (x == L-1) ? res[x + y*L] : phi[(x+1) +  y   *L];
-                up    = (y == 0)   ? res[x + y*L] : phi[ x    + (y-1)*L];
-                down  = (y == L-1) ? res[x + y*L] : phi[ x    + (y+1)*L];
+                left  = phi[(x-1) +  y   *L];
+                right = phi[(x+1) +  y   *L];
+                up    = phi[ x    + (y-1)*L];
+                down  = phi[ x    + (y+1)*L];
                 phi[x + y*L] = res[x + y*L] + p.scale[lev] * (left + right + up + down);
             }
         }
+*/
+
     }
-    
+
     return;
 }
 
@@ -163,7 +199,7 @@ void proj_res(double *res_c, double *res_f, double *phi_f, int lev, param_t p)
     double r[L*L]; // temp residue
     Lc = p.size[lev+1];  // course level
     double left, right, up, down;
-    
+
     //get residue
     for(x = 0; x< L; x++) {
         for(y = 0; y< L; y++) {
@@ -174,7 +210,7 @@ void proj_res(double *res_c, double *res_f, double *phi_f, int lev, param_t p)
             r[x + y*L] = res_f[x + y*L] -  phi_f[x + y*L] + p.scale[lev]*(left + right + up + down);
         }
     }
-    
+
     //project residue
     for(x = 0; x< Lc; x++) {
         for(y = 0; y< Lc; y++) {
@@ -193,7 +229,7 @@ void inter_add(double *phi_f,double *phi_c,int lev,param_t p)
     int L, Lc, x, y;
     Lc = p.size[lev];  // coarse  level
     L = p.size[lev-1];
-    
+
     for(x = 0; x< Lc; x++) {
         for(y = 0; y < Lc; y++) {
             phi_f[ 2*x      +  2*y   *L] += phi_c[x + y*Lc];
@@ -202,14 +238,14 @@ void inter_add(double *phi_f,double *phi_c,int lev,param_t p)
             phi_f[(2*x + 1) + (2*y+1)*L] += phi_c[x + y*Lc];
         }
     }
-    
+
     //set to zero so phi = error
     for(x = 0; x< Lc; x++) {
         for(y = 0; y<Lc; y++) {
             phi_c[x + y*L] = 0.0;
         }
     }
-    
+
     return;
 }
 
@@ -222,7 +258,7 @@ double GetResRoot(double *phi, double *res, int lev, param_t p)
     int L;
     double left, right, up, down;
     L  = p.size[lev];
-    
+
     for(x = 0; x < L; x++) {
         for(y = 0; y<L; y++) {
             left  = (x == 0)   ? res[    y*L] : phi[(x-1) +  y   *L];
@@ -233,6 +269,6 @@ double GetResRoot(double *phi, double *res, int lev, param_t p)
             ResRoot += residue*residue; // true residue
         }
     }
-    
+
     return sqrt(ResRoot);
 }

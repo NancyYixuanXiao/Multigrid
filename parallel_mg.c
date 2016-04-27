@@ -1,5 +1,6 @@
 #include <omp.h>
 #include "parallel_mg.h"
+#include "helpers.h"
 
 void relax_parallel(double *phi, double *res, int lev, int niter, param_t p);
 void proj_res_parallel(double *res_c, double *rec_f, double *phi_f, int lev,param_t p);
@@ -107,15 +108,48 @@ int parallel_multigrid(int Lmax, double (*boundary_func)(int)) {
 
 void relax_parallel(double *phi, double *res, int lev, int niter, param_t p) {
   // printf("relax2: level %i\n", lev);
-  int i, x, y;
+  int i, j;
   int L = p.size[lev];
-  double left, right, up, down;
 
-  double *tmp = malloc(L*L * sizeof(double));
+//  #pragma omp parallel private(i, x, y, left, right, up, down) shared(p)
+  for(int iter=0; iter < niter; iter++) {
+      #pragma omp parallel for collapse(2) shared(phi, res)
+      for (i=1; i<L-1; i++) {
+          for (j=1; j<L-1; j+=2) {
+              int shift;
+              if (i%2 == 0) { shift = 1; }
+              else { shift = 0; }
+              int index       = getIndex(i, j+shift, m);
+              int pos_l  = getIndex(i, j-1+shift, m);
+              int pos_r = getIndex(i, j+1+shift, m);
+              int pos_u    = getIndex(i+1, j+shift, m);
+              int pos_d  = getIndex(i-1, j+shift, m);
 
-  #pragma omp parallel private(i, x, y, left, right, up, down) shared(p)
-  for(i=0; i < niter; i++) {
+              phi[index] = p.scale[lev] * (phi[pos_l] + phi[pos_r]  +
+                                         phi[pos_u] + phi[pos_d]) +
+                         res[index];
+          }
+      }
 
+      // update second half of the board
+      #pragma omp parallel for collapse(2) shared(phi, res)
+      for (i=1; i<L-1; i++) {
+          for (j=2; j<L-1; j+=2) {
+              int shift;
+              if (i%2 == 0) { shift = 1; }
+              else { shift = 0; }
+              int index       = getIndex(i, j+shift, m);
+              int pos_l  = getIndex(i, j-1+shift, m);
+              int pos_r = getIndex(i, j+1+shift, m);
+              int pos_u    = getIndex(i+1, j+shift, m);
+              int pos_d  = getIndex(i-1, j+shift, m);
+
+              phi[index] = p.scale[lev] * (phi[pos_l] + phi[pos_r]  +
+                                         phi[pos_u] + phi[pos_d]) +
+                         res[index];
+          }
+      }
+/*
     #pragma omp for
     for(x = 0; x < L; x++) {
       for(y = 0; y < L; y++) {
@@ -133,6 +167,7 @@ void relax_parallel(double *phi, double *res, int lev, int niter, param_t p) {
         phi[x + y*L] = tmp[x + y*L];
       }
     }
+*/
   }
   return;
 }

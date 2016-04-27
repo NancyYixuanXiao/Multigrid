@@ -14,4 +14,6 @@ typedef struct{
   double scale[20];
 } param_t;
 
+int getIndex(int x, int y, int width);
+
 #endif
