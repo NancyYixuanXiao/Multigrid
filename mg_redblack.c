@@ -1,3 +1,4 @@
+//multigrid with red-black iterations
 #include "mg_serial.h"
 
 void relax(double *phi, double *res, int lev, int niter, param_t p);
