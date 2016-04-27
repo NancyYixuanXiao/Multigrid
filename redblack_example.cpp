@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cmath>
 #include <ctime>
+#include <stdio.h>
+#include <omp.h>
 using namespace std;
 
 void initArrays(double * T, double * b, int n, int m) {
@@ -17,19 +19,30 @@ void initArrays(double * T, double * b, int n, int m) {
 }
 
 int main() {
-    const int n = 100;
-    const int m = 100;
+    const int n = 500;
+    const int m = 500;
     double alpha = 0.9;
     double * T = new double[n*m];
     double * b = new double[n*m];
     initArrays(T, b, n, m);
 
+    /* see if threads are utilized properly */
+    int tid, nthreads;
+    #pragma omp parallel shared(nthreads) private(tid)
+    {
+	tid = omp_get_thread_num();
+	if (tid == 0) { nthreads = omp_get_num_threads(); }
+	#pragma omp barrier
+	printf("hello from thread %d of %d!\n", tid, nthreads);
+    }
+
     double cc = 99.0;
     int iter = 0;
     cout << "Starting without parallel!\n";
-    clock_t start;
+    double t1, t2;
     double duration;
-    start = clock();
+
+    t1 = omp_get_wtime();
     while (cc > 1e-5) {
         redBlackSerial(T, b, n, m, alpha, 1);
         cc = computeResidual(T, b, n, m, alpha);
@@ -37,8 +50,12 @@ int main() {
             cout << "Iteration: " << iter << ", Res: " << cc << "\n";
         }
         iter ++;
+
+        //remove this
+        cc=1e-6;
     }
-    duration = (clock() - start) / (double) CLOCKS_PER_SEC;
+    t2 = omp_get_wtime();
+    duration = (t2 - t1); /// (double) CLOCKS_PER_SEC;
     cout << "Non-parallel: " << duration << " seconds.\n";
 
     FILE * output = fopen("T_serial.txt", "w");
@@ -48,22 +65,23 @@ int main() {
         }
     }
     fclose(output);
-
     initArrays(T, b, n, m);
 
     cc = 99.0;
     iter = 0;
     cout << "Starting with parallel!\n";
-    start = clock();
+    t1 = omp_get_wtime();
     while (cc > 1e-5) {
-        redBlackParallel(T, b, n, m, alpha, 1);
+        //redBlackParallel(T, b, n, m, alpha, 1);
+	gaussSeidelParallel(T, b, n, m, alpha, 1);
         cc = computeResidual(T, b, n, m, alpha);
         if (iter%1000==0) {
             cout << "Iteration: " << iter << ", Res: " << cc << "\n";
         }
         iter ++;
     }
-    duration = (clock() - start) / (double) CLOCKS_PER_SEC;
+    t2 = omp_get_wtime();
+    duration = (t2 - t1);// / (double) CLOCKS_PER_SEC;
     cout << "Parallel: " << duration << " seconds.\n";
 
     output = fopen("T_parallel.txt", "w");

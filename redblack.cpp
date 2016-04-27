@@ -13,7 +13,7 @@ using namespace std;
 void redBlackSerial(double * T, double * b,
                     int n, int m, double alpha, int itermax) {
     int i, j;
-    int index, index_left, index_right, index_up, index_down;
+    int index, pos_l, pos_r, pos_u, pos_d;
 
     int iter = 0;
     while (iter < itermax) {
@@ -21,29 +21,29 @@ void redBlackSerial(double * T, double * b,
         for (i=1; i<n-1; i+=2) {
             for (j=1; j<m-1; j+=2) {
                 index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+                pos_l  = getIndex(i-1, j, m);
+                pos_r = getIndex(i+1, j, m);
+                pos_u    = getIndex(i, j+1, m);
+                pos_d  = getIndex(i, j-1, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
         for (i=2; i<n-1; i+=2) {
             for (j=2; j<m-1; j+=2) {
                 index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+                pos_l  = getIndex(i-1, j, m);
+                pos_r = getIndex(i+1, j, m);
+                pos_u    = getIndex(i, j+1, m);
+                pos_d  = getIndex(i, j-1, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
 
@@ -51,29 +51,29 @@ void redBlackSerial(double * T, double * b,
         for (i=1; i<n-1; i+=2) {
             for(j=2; j<m-1; j+=2) {
                 index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+                pos_l  = getIndex(i-1, j, m);
+                pos_r = getIndex(i+1, j, m);
+                pos_u    = getIndex(i, j+1, m);
+                pos_d  = getIndex(i, j-1, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
         for (i=2; i<n-1; i+=2) {
             for (j=1; j<m-1; j+=2) {
                 index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+                pos_l  = getIndex(i-1, j, m);
+                pos_r = getIndex(i+1, j, m);
+                pos_u    = getIndex(i, j+1, m);
+                pos_d  = getIndex(i, j-1, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
         iter ++;
@@ -87,79 +87,116 @@ void redBlackSerial(double * T, double * b,
 void redBlackParallel(double * T, double * b,
                     int n, int m, double alpha, int itermax) {
     int i, j;
-    int index, index_left, index_right, index_up, index_down;
+    //int index, pos_l, pos_r, pos_u, pos_d, shift;
 
     int iter = 0;
     while (iter < itermax) {
         // update half the board in parallel
-        #pragma omp parallel for collapse(2) \
-                private(i, j) shared(T, b, n, m, alpha)
-        for (i=1; i<n-1; i+=2) {
-            for (j=1; j<m-1; j+=2) {
-                index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+	#pragma omp parallel for collapse(2) shared(T, b) 
+        for (i=1; i<n-1; i++) {
+           // #pragma omp parallel for shared(T, b)
+	    for (j=1; j<m-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = 1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i-1, j+shift, m);
+                int pos_r = getIndex(i+1, j+shift, m);
+                int pos_u    = getIndex(i, j+1+shift, m);
+                int pos_d  = getIndex(i, j-1+shift, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
-        #pragma omp parallel for collapse(2) \
-                private(i, j) shared(T, b, n, m, alpha)
-        for (i=2; i<n-1; i+=2) {
-            for (j=2; j<m-1; j+=2) {
-                index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
 
-                T[index] = (1.0 - alpha) * T[index] +
-                           ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
-            }
+/*        #pragma omp parallel for shared(T, b)
+        for (N=1; N<n*m-1; N+=2) {
+            int i = N/m; int j = N%m;
+            int shift;
+            if (i%2 == 0) { shift = 1; }
+            else { shift = 0; }
+            int index       = getIndex(i, j+shift, m);
+            int pos_l  = getIndex(i-1, j+shift, m);
+            int pos_r = getIndex(i+1, j+shift, m);
+            int pos_u    = getIndex(i, j+1+shift, m);
+            int pos_d  = getIndex(i, j-1+shift, m);
+
+            T[index] = (1.0 - alpha) * T[index] +
+                       ((alpha/4.0) *
+                       (T[pos_l] + T[pos_r] +
+                        T[pos_u]   + T[pos_d] )) + b[index];
         }
+        #pragma omp parallel for shared(T, b)
+        for (N=2; N<n*m-1; N+=2) {
+            int i = N/m; int j = N%m;
+            int shift;
+            if (i%2 == 0) { shift = 1; }
+            else { shift = 0; }
+            int index       = getIndex(i, j+shift, m);
+            int pos_l  = getIndex(i-1, j+shift, m);
+            int pos_r = getIndex(i+1, j+shift, m);
+            int pos_u    = getIndex(i, j+1+shift, m);
+            int pos_d  = getIndex(i, j-1+shift, m);
+i
+            T[index] = (1.0 - alpha) * T[index] +
+                       ((alpha/4.0) *
+                       (T[pos_l] + T[pos_r] +
+                        T[pos_u]   + T[pos_d] )) + b[index];
+        }
+        iter++;
+    }
+*/
 
         // update second half of the board
-        #pragma omp parallel for collapse(2) \
-                private(i, j) shared(T, b, n, m, alpha)
-        for (i=1; i<n-1; i+=2) {
-            for(j=2; j<m-1; j+=2) {
-                index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
+        #pragma omp parallel for collapse(2) shared(T,b)
+        for (i=1; i<n-1; i++) {
+	    //#pragma omp parallel for shared(T, b)
+            for (j=2; j<m-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = -1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i-1, j+shift, m);
+                int pos_r = getIndex(i+1, j+shift, m);
+                int pos_u    = getIndex(i, j+1+shift, m);
+                int pos_d  = getIndex(i, j-1+shift, m);
 
                 T[index] = (1.0 - alpha) * T[index] +
                            ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
-            }
-        }
-        #pragma omp parallel for collapse(2) \
-                private(i, j) shared(T, b, n, m, alpha)
-        for (i=2; i<n-1; i+=2) {
-            for (j=1; j<m-1; j+=2) {
-                index       = getIndex(i, j, m);
-                index_left  = getIndex(i-1, j, m);
-                index_right = getIndex(i+1, j, m);
-                index_up    = getIndex(i, j+1, m);
-                index_down  = getIndex(i, j-1, m);
-
-                T[index] = (1.0 - alpha) * T[index] +
-                           ((alpha/4.0) *
-                           (T[index_left] + T[index_right] +
-                            T[index_up]   + T[index_down] )) + b[index];
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
             }
         }
         iter ++;
     }
+
+}
+
+void gaussSeidelParallel(double* T, double* b, int n, int m, double alpha, int itermax) {
+    int iter=0;
+    int i, j;
+    while (iter < itermax) {
+	#pragma omp parallel for shared(T,b) private(j)
+        for (i=1; i<n-1; i++) {
+	    //#pragma omp parallel for shared(T, b)
+            for (j=1; j<m-1; j++) {
+                int index       = getIndex(i, j, m);
+                int pos_l  = getIndex(i, j-1, m);
+                int pos_r = getIndex(i, j+1, m);
+                int pos_u    = getIndex(i+1, j, m);
+                int pos_d  = getIndex(i-1, j, m);
+
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
+            }
+        }
+	iter++;
+    }	
 }
 
 int getIndex(int x, int y, int width) { return x*width + y; }
@@ -172,22 +209,22 @@ double computeNorm(double * x, int N) {
 
 double computeResidual(double * T, double * b, int n, int m, double alpha) {
     int i, j;
-    int index, index_left, index_right, index_up, index_down;
+    int index, pos_l, pos_r, pos_u, pos_d;
 
     double residual = 0.0;
     for (i=1; i<n-1; i++) {
         for (j=1; j<m-1; j++) {
             double r;
             index       = getIndex(i, j, m);
-            index_left  = getIndex(i-1, j, m);
-            index_right = getIndex(i+1, j, m);
-            index_up    = getIndex(i, j+1, m);
-            index_down  = getIndex(i, j-1, m);
+            pos_l  = getIndex(i-1, j, m);
+            pos_r = getIndex(i+1, j, m);
+            pos_u    = getIndex(i, j+1, m);
+            pos_d  = getIndex(i, j-1, m);
 
             r = (-1.0*alpha*T[index]) +
                 ((alpha/4.0) *
-                (T[index_left] + T[index_right] +
-                 T[index_up]   + T[index_down] )) + b[index];
+                (T[pos_l] + T[pos_r] +
+                 T[pos_u]   + T[pos_d] )) + b[index];
             residual += r*r;
         }
     }
