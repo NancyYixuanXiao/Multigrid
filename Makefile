@@ -1,6 +1,6 @@
 CC= gcc
 RM= rm -vf
-CFLAGS= -Wall -g -std=c99
+CFLAGS= -Wall -g -std=c99 -O3
 OPENMPFLAG= -fopenmp
 LIBS= -lrt -lm
 
