@@ -17,7 +17,7 @@ int parallel_multigrid(int Lmax, double (*boundary_func)(int)) {
   p.Lmax = Lmax; // max number of levels
   p.N = 2*(int)pow(2,p.Lmax);  // MUST BE POWER OF 2
 //  p.m = 0.01;
-  nlev = 2; // NUMBER OF LEVELS:  nlev = 0 give top level alone
+  nlev = 9; // NUMBER OF LEVELS:  nlev = 0 give top level alone
   if(nlev  > p.Lmax){
     printf("  ERROR: More levels than available in lattice! \n");
     return 1;
@@ -79,6 +79,7 @@ int parallel_multigrid(int Lmax, double (*boundary_func)(int)) {
   printf("    At the %d cycle the mag residue is %g \n", ncycle, resmag);
 
   // while(resmag > 0.00001 && ncycle < 10000)
+  FILE *file = fopen("iters_vs_res.dat", "w+");
   while(resmag > 0.00001) {
     ncycle +=1;
     for(lev = 0;lev<nlev; lev++) {  //go down
@@ -92,27 +93,29 @@ int parallel_multigrid(int Lmax, double (*boundary_func)(int)) {
     }
     resmag = GetResRoot_parallel(phi[0],res[0],0,p);
     if (ncycle % 100 == 0) printf("    At the %d cycle the mag residue is %g \n", ncycle, resmag);
+    fprintf(file, "%i %f\n", ncycle, resmag);
   }
+  fclose(file);
 
-  FILE *file = fopen("parallel_data.dat", "w+");
+  file = fopen("parallel_data.dat", "w+");
   for (i=0; i<p.N; i++) {
     for (j=0; j<p.N; j++) {
       fprintf(file, "%i %i %f\n", i, j, phi[0][i + j*p.N]);
     }
   }
+  fclose(file);
 
   return 0;
 }
 
 void relax_parallel(double *T, double *b, int lev, int niter, param_t p) {
-  // printf("relax2: level %i\n", lev);
   int i, j;
   int L = p.size[lev];
   int n=L; int m=L;
   double alpha=p.alpha;
 
   for(int iter=0; iter < niter; iter++) {
-      #pragma omp parallel shared(T, b) private(j)
+      #pragma omp parallel shared(T, b) private(i, j)
       {
         #pragma omp for
         for (i=1; i<n-1; i++) {
