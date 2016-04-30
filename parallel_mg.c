@@ -112,43 +112,46 @@ void relax_parallel(double *T, double *b, int lev, int niter, param_t p) {
   double alpha=p.alpha;
 
   for(int iter=0; iter < niter; iter++) {
-      #pragma omp parallel for shared(T, b) private(j)
-      for (i=1; i<n-1; i++) {
-          for (j=1; j<m-1; j+=2) {
-              int shift;
-              if (i%2 == 0) { shift = 1; }
-              else { shift = 0; }
-              int index       = getIndex(i, j+shift, m);
-              int pos_l  = getIndex(i-1, j+shift, m);
-              int pos_r = getIndex(i+1, j+shift, m);
-              int pos_u    = getIndex(i, j+1+shift, m);
-              int pos_d  = getIndex(i, j-1+shift, m);
+      #pragma omp parallel shared(T, b) private(j)
+      {
+        #pragma omp for
+        for (i=1; i<n-1; i++) {
+            for (j=1; j<m-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = 1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i-1, j+shift, m);
+                int pos_r = getIndex(i+1, j+shift, m);
+                int pos_u    = getIndex(i, j+1+shift, m);
+                int pos_d  = getIndex(i, j-1+shift, m);
 
-              T[index] = (1.0 - alpha) * T[index] +
-                         ((alpha/4.0) *
-                         (T[pos_l] + T[pos_r] +
-                          T[pos_u]   + T[pos_d] )) + b[index];
-          }
-      }
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
+            }
+        }
 
-      // update second half of the board
-      #pragma omp parallel for shared(T, b) private(j)
-      for (i=1; i<n-1; i++) {
-          for (j=2; j<m-1; j+=2) {
-              int shift;
-              if (i%2 == 0) { shift = -1; }
-              else { shift = 0; }
-              int index       = getIndex(i, j+shift, m);
-              int pos_l  = getIndex(i-1, j+shift, m);
-              int pos_r = getIndex(i+1, j+shift, m);
-              int pos_u    = getIndex(i, j+1+shift, m);
-              int pos_d  = getIndex(i, j-1+shift, m);
+        // update second half of the board
+        #pragma omp for
+        for (i=1; i<n-1; i++) {
+            for (j=2; j<m-1; j+=2) {
+                int shift;
+                if (i%2 == 0) { shift = -1; }
+                else { shift = 0; }
+                int index       = getIndex(i, j+shift, m);
+                int pos_l  = getIndex(i-1, j+shift, m);
+                int pos_r = getIndex(i+1, j+shift, m);
+                int pos_u    = getIndex(i, j+1+shift, m);
+                int pos_d  = getIndex(i, j-1+shift, m);
 
-              T[index] = (1.0 - alpha) * T[index] +
-                         ((alpha/4.0) *
-                         (T[pos_l] + T[pos_r] +
-                          T[pos_u]   + T[pos_d] )) + b[index];
-          }
+                T[index] = (1.0 - alpha) * T[index] +
+                           ((alpha/4.0) *
+                           (T[pos_l] + T[pos_r] +
+                            T[pos_u]   + T[pos_d] )) + b[index];
+            }
+        }
       }
   }
   return;
