@@ -221,10 +221,9 @@ void inter_add_parallel(double *phi_f,double *phi_c,int lev,param_t p)
   #pragma omp parallel for private(x, y) shared(p, L, Lc)
   for(x = 0; x < Lc; x++) {
     for(y = 0; y < Lc; y++) {
-      phi_c[x + y*L] = 0.0;
+      phi_c[x + y*Lc] = 0.0;
     }
   }
-
   return;
 }
 

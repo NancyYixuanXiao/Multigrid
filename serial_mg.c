@@ -47,7 +47,7 @@ int multigrid(int Lmax, double (*boundary_func)(int)) {
       res[lev][i] = 0.0;
     }
   }
-/*
+
   // set up the boundary conditions
   for (i=0; i<p.N; i++) {
     double tmp = (*boundary_func)(i);
@@ -57,7 +57,7 @@ int multigrid(int Lmax, double (*boundary_func)(int)) {
     phi[0][(p.N * (i+1)) - 1] = tmp;    // right edge, top to bottom
     phi[0][(p.N * p.N) - i - 1] = tmp;   // bottom edge, right to left
   }
-*/
+
   FILE *nfile = fopen("res_data.dat", "w+");
   for (i=0; i<p.N; i++) {
     for (j=0; j<p.N; j++) {
@@ -237,7 +237,7 @@ void inter_add(double *phi_f,double *phi_c,int lev,param_t p)
   //set to zero so phi = error
   for(x = 0; x < Lc; x++) {
     for(y = 0; y < Lc; y++) {
-      phi_c[x + y*L] = 0.0;
+      phi_c[x + y*Lc] = 0.0;
     }
   }
 
